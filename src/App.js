@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 
 export default function App() {
   const [inputMin, setInputMin] = useState("0");
-  const [inputSec, setInputSec] = useState("0");
-
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
@@ -13,35 +11,29 @@ export default function App() {
   useEffect(() => {
     if (isRunning && remainingSeconds > 0) {
       intervalRef.current = setInterval(() => {
-        setRemainingSeconds((sec) => sec - 1);
+        setRemainingSeconds((sec) => {
+          if (sec <= 1) {
+            clearInterval(intervalRef.current);
+            setIsRunning(false);
+            return 0;
+          }
+          return sec - 1;
+        });
       }, 1000);
-    }
-    if (!isRunning || remainingSeconds === 0) {
+    } else {
       clearInterval(intervalRef.current);
-      if (remainingSeconds === 0 && totalSeconds !== 0) {
-        setIsRunning(false);
-      }
     }
     return () => clearInterval(intervalRef.current);
-  }, [isRunning, remainingSeconds, totalSeconds]);
+  }, [isRunning]);
 
   const startTimer = () => {
-    const min = parseInt(inputMin, 10);
-    const sec = parseInt(inputSec, 10);
-
-    if (
-      isNaN(min) ||
-      isNaN(sec) ||
-      min < 0 ||
-      sec < 0 ||
-      sec >= 60 ||
-      (min === 0 && sec === 0)
-    ) {
-      alert("正しい分（0以上）と秒（0～59）を入力してください");
+    let min = parseInt(inputMin, 10);
+    if (isNaN(min) || min <= 0 || min > 60) {
+      alert("正しい分（1～60）を入力してください");
       return;
     }
 
-    const total = min * 60 + sec;
+    const total = min * 60;
     setTotalSeconds(total);
     setRemainingSeconds(total);
     setIsRunning(true);
@@ -59,19 +51,48 @@ export default function App() {
   const displayMin = Math.floor(remainingSeconds / 60);
   const displaySec = remainingSeconds % 60;
 
-  const secondsAngle = (remainingSeconds % 60) * 6;
-  const minutesAngle = Math.floor(remainingSeconds / 60) * 6;
+  const inputMinutes = Math.min(Math.max(parseInt(inputMin, 10) || 0, 0), 60);
+  const maxAngle = inputMinutes * 6; // 60分なら360度
 
-  // 色の変化：半分以上は白、半分切ったら白→赤に変化
-  const halfTime = totalSeconds / 2;
-  let bgColor;
-  if (remainingSeconds > halfTime) {
-    bgColor = "rgb(255, 255, 255)";
-  } else {
-    const ratio = halfTime === 0 ? 0 : remainingSeconds / halfTime;
-    const greenBlue = Math.floor(255 * ratio);
-    bgColor = `rgb(255, ${greenBlue}, ${greenBlue})`;
-  }
+  // 残り時間に応じた分針角度（反時計回り）
+  const minutesAngle = totalSeconds
+    ? maxAngle * (remainingSeconds / totalSeconds)
+    : 0;
+
+  const radius = 48;
+  const centerX = 50;
+  const centerY = 50;
+
+  const polarToCartesian = (cx, cy, r, angleInDegrees) => {
+    const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
+    return {
+      x: cx + r * Math.cos(angleInRadians),
+      y: cy + r * Math.sin(angleInRadians),
+    };
+  };
+
+  const describeArc = (x, y, radius, startAngle, endAngle) => {
+    const start = polarToCartesian(x, y, radius, startAngle);
+    const end = polarToCartesian(x, y, radius, endAngle);
+
+    let diff = startAngle - endAngle;
+    if (diff < 0) diff += 360;
+
+    const largeArcFlag = diff > 180 ? 1 : 0;
+
+    // sweep-flag = 0 → 反時計回り
+    return [
+      `M ${x} ${y}`,
+      `L ${start.x} ${start.y}`,
+      `A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`,
+      "Z",
+    ].join(" ");
+  };
+
+  const shouldDrawArc = inputMinutes > 0 && remainingSeconds > 0;
+  const arcPath = shouldDrawArc
+    ? describeArc(centerX, centerY, radius, minutesAngle, 0) // 分針→12時 方向に描画
+    : null;
 
   return (
     <div
@@ -83,33 +104,21 @@ export default function App() {
         alignItems: "center",
         justifyContent: "center",
         fontFamily: "Arial, sans-serif",
-        transition: "background-color 1s linear",
       }}
     >
-      <h1>アナログタイマー</h1>
+      <h1>うえタイマー</h1>
 
       <div style={{ marginBottom: 20 }}>
-        <label>
-          分:{" "}
-          <input
-            type="number"
-            min="0"
-            value={inputMin}
-            onChange={(e) => setInputMin(e.target.value)}
-            style={{ width: 50 }}
-          />
-        </label>
-        <label style={{ marginLeft: 10 }}>
-          秒:{" "}
-          <input
-            type="number"
-            min="0"
-            max="59"
-            value={inputSec}
-            onChange={(e) => setInputSec(e.target.value)}
-            style={{ width: 50 }}
-          />
-        </label>
+        <input
+          type="number"
+          min="1"
+          max="60"
+          value={inputMin}
+          onChange={(e) => setInputMin(e.target.value)}
+          style={{ width: 50 }}
+          disabled={isRunning}
+        />
+        <span style={{ marginLeft: 5 }}>分</span>
       </div>
 
       <div style={{ marginBottom: 30 }}>
@@ -127,23 +136,26 @@ export default function App() {
       </div>
 
       <svg width="200" height="200" viewBox="0 0 100 100">
-        {/* 時計盤（色が動的に変わる部分） */}
+        {/* 時計盤の白い円 */}
         <circle
           cx="50"
           cy="50"
           r="48"
-          fill={bgColor}
+          fill="#fff"
           stroke="#000"
           strokeWidth="2"
         />
 
+        {/* 赤い扇形（分針→12時の間） */}
+        {shouldDrawArc && <path d={arcPath} fill="rgba(255,0,0,0.6)" />}
+
+        {/* 12個の目盛り */}
         {[...Array(12)].map((_, i) => {
           const minute = i * 5;
           const angle = (minute * 6 - 90) * (Math.PI / 180);
-          const radius = 42;
-          const x = 50 + radius * Math.cos(angle);
-          const y = 50 + radius * Math.sin(angle);
-
+          const radiusText = 42;
+          const x = 50 + radiusText * Math.cos(angle);
+          const y = 50 + radiusText * Math.sin(angle);
           return (
             <text
               key={minute}
@@ -160,28 +172,19 @@ export default function App() {
           );
         })}
 
+        {/* 分針（赤色） */}
         <line
           x1="50"
           y1="50"
           x2="50"
           y2="20"
-          stroke="#000"
+          stroke="red"
           strokeWidth="3"
           strokeLinecap="round"
           transform={`rotate(${minutesAngle} 50 50)`}
         />
 
-        <line
-          x1="50"
-          y1="50"
-          x2="50"
-          y2="10"
-          stroke="red"
-          strokeWidth="2"
-          strokeLinecap="round"
-          transform={`rotate(${secondsAngle} 50 50)`}
-        />
-
+        {/* 中心の丸 */}
         <circle cx="50" cy="50" r="3" fill="#000" />
       </svg>
 
@@ -191,4 +194,3 @@ export default function App() {
     </div>
   );
 }
-
