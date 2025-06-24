@@ -5,7 +5,7 @@ export default function App() {
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [theme, setTheme] = useState("default");
+  const [hasStarted, setHasStarted] = useState(false); // 再開ボタン表示制御用
   const [completedMessage, setCompletedMessage] = useState("");
 
   const intervalRef = useRef(null);
@@ -29,7 +29,7 @@ export default function App() {
   }, [isRunning]);
 
   const startTimer = () => {
-    let min = parseInt(inputMin, 10);
+    const min = parseInt(inputMin, 10);
     if (isNaN(min) || min <= 0 || min > 60) {
       alert("正しい分（1～60）を入力してください");
       return;
@@ -39,20 +39,30 @@ export default function App() {
     setTotalSeconds(total);
     setRemainingSeconds(total);
     setIsRunning(true);
+    setHasStarted(true);
     setCompletedMessage("");
   };
 
-  const pauseTimer = () => setIsRunning(false);
+  const resumeTimer = () => {
+    if (remainingSeconds > 0) {
+      setIsRunning(true);
+      setCompletedMessage("");
+    }
+  };
+
+  const pauseTimer = () => {
+    setIsRunning(false);
+  };
+
   const resetTimer = () => {
     setIsRunning(false);
     setRemainingSeconds(totalSeconds);
+    setHasStarted(false);
     setCompletedMessage("");
   };
 
-  // 🎉 完了ボタン処理
   const handleComplete = () => {
     setIsRunning(false);
-
     const compliments = [
       "よくがんばったね！",
       "集中できたね！",
@@ -61,13 +71,10 @@ export default function App() {
       "学習マスターだ！",
       "すごい集中力！",
       "毎日えらいね！",
-      "パパがちゅーしてあげる！"
     ];
-
     const rand = compliments[Math.floor(Math.random() * compliments.length)];
     const min = Math.floor(remainingSeconds / 60);
     const sec = remainingSeconds % 60;
-
     setCompletedMessage(
       `✅ 学習完了！ 残り ${min}分${sec.toString().padStart(2, "0")}秒\n✨ ${rand}`
     );
@@ -113,42 +120,11 @@ export default function App() {
     ? describeArc(centerX, centerY, radius, minutesAngle, 0)
     : null;
 
-const themeStyles = {
-  default: {
-    background: "#ffffff",
-    color: "#000",
-  },
-  forest: {
-    background: "linear-gradient(to bottom, #a8e063, #56ab2f)",
-    color: "#000",
-  },
-  ocean: {
-    background: "linear-gradient(to bottom, #56ccf2, #2f80ed)",
-    color: "#000",
-  },
-  space: {
-    background: "radial-gradient(circle at center, #0f0c29, #302b63, #24243e)",
-    color: "#fff",
-  },
-  mario: {
-    backgroundImage: "url('/mario.jpg')",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    color: "#fff", // 画像の上に文字が見やすいよう白文字に
-  },
-  pikumin: {
-    backgroundImage: "url('/pikumin.jpg')",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    color: "#000",
-  },
-};
-
   return (
     <div
       style={{
         height: "100vh",
-        ...themeStyles[theme],
+        background: "#fff",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -157,30 +133,8 @@ const themeStyles = {
         whiteSpace: "pre-wrap",
       }}
     >
-      <h1
-  style={{
-    backgroundColor: "rgba(255, 255, 255, 0.8)", // 白の半透明
-    padding: "8px 16px",
-    borderRadius: "8px",
-    color: theme === "space" || theme === "mario" ? "#000" : "#000", // 文字色は黒で統一（必要に応じて調整可）
-    userSelect: "none",
-  }}
->
-  うえタイマー
-</h1>
+      <h1>うえタイマー</h1>
 
-<div style={{ marginBottom: 15 }}>
-  <label>テーマ: </label>
-  <select
-    value={theme}
-    onChange={(e) => setTheme(e.target.value)}
-    style={{ padding: "4px" }}
-  >
-    <option value="default">標準</option>
-    <option value="mario">🍄 マリオ</option>
-    <option value="pikumin">🌱 ピクミン</option>
-  </select>
-</div>
       <div style={{ marginBottom: 20 }}>
         <input
           type="number"
@@ -189,17 +143,23 @@ const themeStyles = {
           value={inputMin}
           onChange={(e) => setInputMin(e.target.value)}
           style={{ width: 50 }}
-          disabled={isRunning}
+          disabled={isRunning || hasStarted}
         />
         <span style={{ marginLeft: 5 }}>分</span>
       </div>
 
       <div style={{ marginBottom: 30 }}>
-        {!isRunning ? (
+        {!hasStarted && (
           <button onClick={startTimer} style={{ marginRight: 10 }}>
             スタート
           </button>
-        ) : (
+        )}
+        {hasStarted && !isRunning && (
+          <button onClick={resumeTimer} style={{ marginRight: 10 }}>
+            再開
+          </button>
+        )}
+        {isRunning && (
           <button onClick={pauseTimer} style={{ marginRight: 10 }}>
             一時停止
           </button>
@@ -207,7 +167,7 @@ const themeStyles = {
         <button onClick={resetTimer} style={{ marginRight: 10 }}>
           リセット
         </button>
-        {isRunning && (
+        {hasStarted && (
           <button onClick={handleComplete} style={{ backgroundColor: "#f0c040" }}>
             完了
           </button>
@@ -272,7 +232,7 @@ const themeStyles = {
             border: "1px solid #ccc",
             maxWidth: 300,
             textAlign: "center",
-            color: "#000", 
+            color: "#000",
           }}
         >
           {completedMessage}
